@@ -1,0 +1,7 @@
+<Solution>
+  <Configurations>
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Project Path="CollatzSequenceTask.vcxproj" Id="e976ccbf-0307-4e25-942a-620005aa5f4e" />
+</Solution>
