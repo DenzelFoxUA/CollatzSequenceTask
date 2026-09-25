@@ -4,11 +4,24 @@
 #include <QMainWindow>
 #include <QPushButton>
 #include <QSlider>
-#include <QSpinBox>
 #include <QPlainTextEdit>
 #include <QLabel>
 #include <QTimer>
 #include <QElapsedTimer>
+//замість <QSpinBox> ввів QLine щоб отримувати стрінгу з 
+//лімітом 20 символів і RegEx щоб тільки цифри можна було вводити
+//бо, я знаю що ми маємо обмеження 10 000 000 але ж і працюємо з uint64
+#include <QLineEdit>
+#include <QRegularExpression>
+#include <QRegularExpressionValidator>
+
+#include <QApplication>
+#include <QWidget>
+#include <QVBoxLayout>
+#include <QHBoxLayout>
+
+//#include <thread>
+//#include <cstdint>
 
 #include "CollatzSequenceProcessor.h"
 
@@ -26,7 +39,7 @@ private:
     QLabel* threadValueLabel = nullptr;
 
     //[MAX NUMBER]
-    QSpinBox* maxNumberSpinBox = nullptr;
+    QLineEdit* maxNumberLimit = nullptr;
 
     //[OUTPUT]
     QPlainTextEdit* outputField = nullptr;

@@ -1,19 +1,14 @@
 #include "UserInterface.h"
 
-#include <QApplication>
-#include <QWidget>
-#include <QVBoxLayout>
-#include <QHBoxLayout>
 
-#include <thread>
-#include <cstdint>
 
-MainWindow::MainWindow(QWidget* parent)
-    : QMainWindow(parent)
+MainWindow::MainWindow(QWidget* parent): QMainWindow(parent)
 {
-    setWindowTitle("Collatz Sequence Processor");
-    resize(650, 420);
+    const int width = 650;
+    const int height = 420;
 
+    setWindowTitle("Collatz Sequence Processor");
+    resize(width, height);
 
     //=========================================
     // CENTRAL WIDGET
@@ -22,103 +17,71 @@ MainWindow::MainWindow(QWidget* parent)
     QWidget* centralWidget = new QWidget(this);
     setCentralWidget(centralWidget);
 
-    QVBoxLayout* mainLayout =
-        new QVBoxLayout(centralWidget);
-
+    QVBoxLayout* mainLayout = new QVBoxLayout(centralWidget);
 
     //=========================================
     // MAX NUMBER
     //=========================================
 
-    QLabel* maxNumberLabel =
-        new QLabel("Upper search limit:", this);
+    QLabel* maxNumberLabel = new QLabel("Upper search limit:", this);
 
-    maxNumberSpinBox =
-        new QSpinBox(this);
+    maxNumberLimit = new QLineEdit(this);
 
-    constexpr int MAX_SEARCH_LIMIT = 10'000'000;
+    maxNumberLimit->setText("1000");
+    maxNumberLimit->setMaxLength(20);
 
-    maxNumberSpinBox->setRange(
-        1,
-        MAX_SEARCH_LIMIT
+    auto* validator = new QRegularExpressionValidator(
+        QRegularExpression("[0-9]{1,20}"),
+        maxNumberLimit
     );
 
-    maxNumberSpinBox->setValue(1000);
+    maxNumberLimit->setValidator(validator);
 
-
-    QHBoxLayout* maxNumberLayout =
-        new QHBoxLayout();
+    QHBoxLayout* maxNumberLayout = new QHBoxLayout();
 
     maxNumberLayout->addWidget(maxNumberLabel);
-    maxNumberLayout->addWidget(maxNumberSpinBox);
+    maxNumberLayout->addWidget(maxNumberLimit);
 
     mainLayout->addLayout(maxNumberLayout);
-
 
     //=========================================
     // THREAD SLIDER
     //=========================================
 
-    unsigned int hardwareThreads =
-        std::thread::hardware_concurrency();
+    unsigned int hardwareThreads = GlobalFunctions::getHardwareNumOfThreads();
 
-    if (hardwareThreads == 0)
-        hardwareThreads = 1;
-
-
-    QLabel* threadLabel =
-        new QLabel("Calculation threads:", this);
-
-
-    threadSlider =
-        new QSlider(Qt::Horizontal, this);
+    QLabel* threadLabel = new QLabel("Calculation threads:", this);
+    threadSlider = new QSlider(Qt::Horizontal, this);
 
     threadSlider->setMinimum(1);
-
-    threadSlider->setMaximum(
-        static_cast<int>(hardwareThreads)
-    );
+    threadSlider->setMaximum(static_cast<int>(hardwareThreads));
 
     threadSlider->setValue(1);
 
-    threadSlider->setTickPosition(
-        QSlider::TicksBelow
-    );
+    threadSlider->setTickPosition(QSlider::TicksBelow);
+
+    threadValueLabel = new QLabel(QString::number(threadSlider->value()),this);
 
 
-    threadValueLabel =
-        new QLabel(
-            QString::number(threadSlider->value()),
-            this
-        );
-
-
-    QHBoxLayout* threadLayout =
-        new QHBoxLayout();
+    QHBoxLayout* threadLayout = new QHBoxLayout();
 
     threadLayout->addWidget(threadLabel);
     threadLayout->addWidget(threadSlider);
     threadLayout->addWidget(threadValueLabel);
-
     mainLayout->addLayout(threadLayout);
-
 
     //=========================================
     // BUTTONS
     //=========================================
 
-    startButton =
-        new QPushButton("Start", this);
+    startButton = new QPushButton("Start", this);
 
-    stopButton =
-        new QPushButton("Stop", this);
+    stopButton = new QPushButton("Stop", this);
 
-    exitButton =
-        new QPushButton("Exit", this);
+    exitButton = new QPushButton("Exit", this);
 
 
-    QHBoxLayout* buttonLayout =
-        new QHBoxLayout();
+    QHBoxLayout* buttonLayout = new QHBoxLayout();
 
     buttonLayout->addWidget(startButton);
     buttonLayout->addWidget(stopButton);
@@ -131,11 +94,9 @@ MainWindow::MainWindow(QWidget* parent)
     // OUTPUT
     //=========================================
 
-    QLabel* outputLabel =
-        new QLabel("Output:", this);
+    QLabel* outputLabel = new QLabel("Output:", this);
 
-    outputField =
-        new QPlainTextEdit(this);
+    outputField = new QPlainTextEdit(this);
 
     outputField->setReadOnly(true);
 
@@ -234,7 +195,7 @@ void MainWindow::setRunningState(bool running)
     stopButton->setEnabled(running);
 
     threadSlider->setEnabled(!running);
-    maxNumberSpinBox->setEnabled(!running);
+    maxNumberLimit->setEnabled(!running);
 }
 
 
@@ -248,17 +209,22 @@ void MainWindow::startCalculation()
         CollatzSequenceProcessor::getInstance();
 
 
-    std::uint64_t maxNumber =
-        static_cast<std::uint64_t>(
-            maxNumberSpinBox->value()
+    bool isNumOk = false;
+
+    qulonglong value =
+        maxNumberLimit->text().toULongLong(&isNumOk);
+
+    if (!isNumOk || value == 0)
+    {
+        outputField->setPlainText(
+            "Invalid maximum number."
         );
 
+        return;
+    }
 
-    unsigned int threadCount =
-        static_cast<unsigned int>(
-            threadSlider->value()
-        );
-
+    std::uint64_t maxNumber = static_cast<std::uint64_t>(value);
+    unsigned int threadCount = static_cast<unsigned int>(threadSlider->value());
 
     stoppedByUser = false;
 

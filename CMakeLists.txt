@@ -15,6 +15,12 @@ qt_add_executable(CollatzSequenceTask
     UserInterface.h
     CollatzSequenceProcessor.h
     CollatzSequenceProcessor.cpp
+    Globals/Constants.h
+    Globals/Constants.cpp
+)
+
+target_include_directories(CollatzSequenceTask PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/Globals
 )
 
 target_link_libraries(CollatzSequenceTask

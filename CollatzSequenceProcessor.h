@@ -1,12 +1,10 @@
 #ifndef COLLATZ_SEQUENCE_PROCESSOR_h
 #define COLLATZ_SEQUENCE_PROCESSOR_h
 
-#include <cstdint>
-#include <limits>
+
 #include <stdexcept>
 #include <cstring>
 #include <string>
-#include <thread>
 #include <vector>
 #include <mutex>
 #include <atomic>
@@ -14,6 +12,8 @@
 #include <iostream>
 #include <chrono>
 #include <algorithm>
+
+#include "Constants.h"
 
 struct CollatzSequence
 {
@@ -179,7 +179,7 @@ private:
 
 	void runCalculation(std::uint64_t max_n, unsigned int num_of_threads)
 	{
-		unsigned int maxThreads = std::thread::hardware_concurrency() == 0 ? 1 : std::thread::hardware_concurrency();
+		unsigned int maxThreads = GlobalFunctions::getHardwareNumOfThreads();
 		maxThreads = static_cast<std::uint64_t>(maxThreads) > max_n ? 
 			static_cast<unsigned int>(max_n) : maxThreads;
 		numOfThreads = std::clamp(num_of_threads, 1u, maxThreads);
@@ -279,6 +279,11 @@ public:
 	bool hasError() const
 	{
     	return err_found.load();
+	}
+
+	unsigned int getCurrNumOfThreads() const
+	{
+		return numOfThreads;
 	}
 
 	~CollatzSequenceProcessor()
