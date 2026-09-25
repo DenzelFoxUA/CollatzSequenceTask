@@ -368,3 +368,9 @@ CMakeUserPresets.json
 CMakeFiles/
 CMakeCache.txt
 cmake_install.cmake
+
+#SLN_Ignore
+*.sln
+*.slnx
+*.vcxproj
+*.vcxproj.filters
