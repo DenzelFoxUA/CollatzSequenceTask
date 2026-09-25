@@ -271,6 +271,16 @@ public:
 		return best_result;
 	}
 
+	bool isRunning() const
+	{
+    	return is_started.load();
+	}
+
+	bool hasError() const
+	{
+    	return err_found.load();
+	}
+
 	~CollatzSequenceProcessor()
 	{
 		is_stop = true;
