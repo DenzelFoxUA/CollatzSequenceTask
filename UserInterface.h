@@ -44,8 +44,8 @@ private:
     //[OUTPUT]
     QPlainTextEdit* outputField = nullptr;
 
-    //[CALCULATION WATCHER]
-    QTimer* calculationWatcher = nullptr;
+    //[CALCULATION OBSERVER]
+    QTimer* runtimeObserver = nullptr;
 
     //[TIME]
     QElapsedTimer elapsedTimer;

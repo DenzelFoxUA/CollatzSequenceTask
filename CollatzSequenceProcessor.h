@@ -3,8 +3,6 @@
 
 
 #include <stdexcept>
-#include <cstring>
-#include <string>
 #include <vector>
 #include <mutex>
 #include <atomic>
@@ -12,6 +10,8 @@
 #include <iostream>
 #include <chrono>
 #include <algorithm>
+#include <cstring>
+#include <string>
 
 #include "Constants.h"
 
@@ -58,7 +58,6 @@ public:
 class CollatzSequenceProcessor
 {
 private:
-	static constexpr std::uint64_t firstNum = 1;
 	std::uint64_t numMax = 0;
 
 	std::atomic<unsigned int> numOfThreads = 0;
@@ -90,7 +89,7 @@ private:
 		res.num = num;
 		res.sequence_l = 1;
 
-		while (num > firstNum)
+		while (num > GlobalConstants::MIN_VALUE_LIMIT)
 		{
 			if (num % 2 == 0)
 			{

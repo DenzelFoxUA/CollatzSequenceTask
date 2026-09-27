@@ -1,39 +1,29 @@
 #include "UserInterface.h"
 
-
-
 MainWindow::MainWindow(QWidget* parent): QMainWindow(parent)
 {
-    const int width = 650;
-    const int height = 420;
 
+    //WINDOW
+    const int width = 650;
+    const int height = 450;
     setWindowTitle("Collatz Sequence Processor");
     resize(width, height);
 
-    //=========================================
-    // CENTRAL WIDGET
-    //=========================================
+    // MAIN WIDGET
+    QWidget* mainWidget = new QWidget(this);
+    setCentralWidget(mainWidget);
+    QVBoxLayout* mainLayout = new QVBoxLayout(mainWidget);
 
-    QWidget* centralWidget = new QWidget(this);
-    setCentralWidget(centralWidget);
-
-    QVBoxLayout* mainLayout = new QVBoxLayout(centralWidget);
-
-    //=========================================
-    // MAX NUMBER
-    //=========================================
-
+    //MAX NUMBER
     QLabel* maxNumberLabel = new QLabel("Upper search limit:", this);
 
     maxNumberLimit = new QLineEdit(this);
 
-    maxNumberLimit->setText("1000");
-    maxNumberLimit->setMaxLength(20);
+    maxNumberLimit->setText(QString::number(GlobalConstants::CALC_DEFAULT_NUMBER));
+    maxNumberLimit->setMaxLength(GlobalConstants::NUM_OF_DIGITS_MAX);
 
     auto* validator = new QRegularExpressionValidator(
-        QRegularExpression("[0-9]{1,20}"),
-        maxNumberLimit
-    );
+        QRegularExpression(RegExPatterns::NUM_INPUT),maxNumberLimit);
 
     maxNumberLimit->setValidator(validator);
 
@@ -41,45 +31,37 @@ MainWindow::MainWindow(QWidget* parent): QMainWindow(parent)
 
     maxNumberLayout->addWidget(maxNumberLabel);
     maxNumberLayout->addWidget(maxNumberLimit);
-
     mainLayout->addLayout(maxNumberLayout);
 
-    //=========================================
     // THREAD SLIDER
-    //=========================================
-
     unsigned int hardwareThreads = GlobalFunctions::getHardwareNumOfThreads();
 
-    QLabel* threadLabel = new QLabel("Calculation threads:", this);
+    QLabel* threadLabel = new QLabel("Calculation threads num:", this);
     threadSlider = new QSlider(Qt::Horizontal, this);
 
-    threadSlider->setMinimum(1);
+    threadSlider->setMinimum(GlobalConstants::MIN_VALUE_LIMIT);
     threadSlider->setMaximum(static_cast<int>(hardwareThreads));
 
-    threadSlider->setValue(1);
+    threadSlider->setValue(GlobalConstants::MIN_VALUE_LIMIT);
 
     threadSlider->setTickPosition(QSlider::TicksBelow);
+    threadSlider->setTickInterval(1);
 
     threadValueLabel = new QLabel(QString::number(threadSlider->value()),this);
-
 
     QHBoxLayout* threadLayout = new QHBoxLayout();
 
     threadLayout->addWidget(threadLabel);
     threadLayout->addWidget(threadSlider);
     threadLayout->addWidget(threadValueLabel);
+
     mainLayout->addLayout(threadLayout);
 
-    //=========================================
     // BUTTONS
-    //=========================================
 
     startButton = new QPushButton("Start", this);
-
     stopButton = new QPushButton("Stop", this);
-
     exitButton = new QPushButton("Exit", this);
-
 
     QHBoxLayout* buttonLayout = new QHBoxLayout();
 
@@ -89,12 +71,9 @@ MainWindow::MainWindow(QWidget* parent): QMainWindow(parent)
 
     mainLayout->addLayout(buttonLayout);
 
+    // OUTPUT BOX
 
-    //=========================================
-    // OUTPUT
-    //=========================================
-
-    QLabel* outputLabel = new QLabel("Output:", this);
+    QLabel* outputLabel = new QLabel("RESULT:", this);
 
     outputField = new QPlainTextEdit(this);
 
@@ -104,91 +83,53 @@ MainWindow::MainWindow(QWidget* parent): QMainWindow(parent)
     mainLayout->addWidget(outputField);
 
 
-    //=========================================
-    // CALCULATION WATCHER
-    //=========================================
-
-    calculationWatcher =
-        new QTimer(this);
-
-    calculationWatcher->setInterval(50);
+    // CALCULATION OBSERVER
+    runtimeObserver = new QTimer(this);
+    runtimeObserver->setInterval(GlobalConstants::DEFAULT_TIMER_INTERVAL_MSEC);
 
 
-    //=========================================
     // CONNECTIONS
-    //=========================================
-
-    QObject::connect(
-        threadSlider,
-        &QSlider::valueChanged,
-        this,
+    QObject::connect(threadSlider,&QSlider::valueChanged,this,
         [this](int value)
         {
-            threadValueLabel->setText(
-                QString::number(value)
-            );
-        }
-    );
+            threadValueLabel->setText(QString::number(value));
+        });
 
-
-    QObject::connect(
-        startButton,
-        &QPushButton::clicked,
-        this,
+    QObject::connect(startButton,&QPushButton::clicked,this,
         [this]()
         {
             startCalculation();
-        }
-    );
+        });
 
-
-    QObject::connect(
-        stopButton,
-        &QPushButton::clicked,
-        this,
+    QObject::connect(stopButton,&QPushButton::clicked,this,
         [this]()
         {
             stopCalculation();
-        }
-    );
+        });
 
-
-    QObject::connect(
-        exitButton,
-        &QPushButton::clicked,
-        this,
+    QObject::connect(exitButton,&QPushButton::clicked,this,
         [this]()
         {
-            auto& processor =
-                CollatzSequenceProcessor::getInstance();
-
+            auto& processor = CollatzSequenceProcessor::getInstance();
             processor.stop();
-
             close();
-        }
-    );
+        });
 
-
-    QObject::connect(
-        calculationWatcher,
-        &QTimer::timeout,
-        this,
+    QObject::connect(runtimeObserver,&QTimer::timeout,this,
         [this]()
         {
+            //кожні дефолтні мілісекунди меревіряти стан
             checkCalculationState();
-        }
-    );
-
+        });
 
     //Initial UI state
     setRunningState(false);
 }
 
 
-//==================================================
-// UI STATE
-//==================================================
+// Methods ------------------------------------------ 
 
+// UI STATe
 void MainWindow::setRunningState(bool running)
 {
     startButton->setEnabled(!running);
@@ -198,27 +139,20 @@ void MainWindow::setRunningState(bool running)
     maxNumberLimit->setEnabled(!running);
 }
 
-
-//==================================================
 // START
-//==================================================
 
 void MainWindow::startCalculation()
 {
-    auto& processor =
-        CollatzSequenceProcessor::getInstance();
-
+    auto& processor = CollatzSequenceProcessor::getInstance();
 
     bool isNumOk = false;
 
-    qulonglong value =
-        maxNumberLimit->text().toULongLong(&isNumOk);
+    //отримання ulonglong числа і перевірка за допомогою метода QString, який може міняти bool
+    qulonglong value = maxNumberLimit->text().toULongLong(&isNumOk);
 
     if (!isNumOk || value == 0)
     {
-        outputField->setPlainText(
-            "Invalid maximum number."
-        );
+        outputField->setPlainText("Invalid maximum number.");
 
         return;
     }
@@ -227,151 +161,76 @@ void MainWindow::startCalculation()
     unsigned int threadCount = static_cast<unsigned int>(threadSlider->value());
 
     stoppedByUser = false;
-
     outputField->clear();
-
-    outputField->appendPlainText(
-        "Calculation started..."
-    );
-
+    outputField->appendPlainText("Calculation started...");
 
     setRunningState(true);
-
-
-    //Start timer before calculation
     elapsedTimer.start();
-
-
-    processor.start(
-        maxNumber,
-        threadCount
-    );
-
-
-    //Start checking processor state
-    calculationWatcher->start();
+    processor.start(maxNumber,threadCount);
+    runtimeObserver->start();
 }
 
-
-//==================================================
 // STOP
-//==================================================
 
 void MainWindow::stopCalculation()
 {
-    auto& processor =
-        CollatzSequenceProcessor::getInstance();
-
+    auto& processor = CollatzSequenceProcessor::getInstance();
 
     if (!processor.isRunning())
         return;
 
-
     stoppedByUser = true;
-
 
     processor.stop();
 
-
-    //Do not allow Stop to be pressed repeatedly
+    //кнопка вимкн
     stopButton->setEnabled(false);
 
-
-    outputField->appendPlainText(
-        "Stopping calculation..."
-    );
+    outputField->appendPlainText("Stopping calculation...");
 }
 
-
-//==================================================
 // CALCULATION STATE CHECK
-//==================================================
 
 void MainWindow::checkCalculationState()
 {
-    auto& processor =
-        CollatzSequenceProcessor::getInstance();
+    auto& processor = CollatzSequenceProcessor::getInstance();
 
-
-    //Calculation is still running
     if (processor.isRunning())
         return;
 
-
-    //Calculation finished
-    calculationWatcher->stop();
+    runtimeObserver->stop();
 
 
-    qint64 elapsedMilliseconds =
-        elapsedTimer.elapsed();
-
-
+    qint64 elapsedMilliseconds = elapsedTimer.elapsed();
     setRunningState(false);
 
-
-    //=========================================
-    // STOPPED BY USER
-    //=========================================
-
+    // Якщо STOPPED BY USER
     if (stoppedByUser)
     {
-        outputField->appendPlainText(
-            "Calculation stopped by user."
-        );
-
+        outputField->appendPlainText("Calculation stopped by user.");
         return;
     }
 
-
-    //=========================================
-    // ERROR
-    //=========================================
-
+    // Якщо ERROR STOP
     if (processor.hasError())
     {
-        outputField->appendPlainText(
-            "Calculation failed."
-        );
-
-        outputField->appendPlainText(
-            "Intermediate Collatz value "
-            "exceeded uint64_t range."
-        );
-
+        outputField->appendPlainText("Calculation failed.");
+        outputField->appendPlainText("Intermediate Collatz value exceeded uint64_t range.");
         return;
     }
 
+    // Якщо SUCCESS
 
-    //=========================================
-    // SUCCESS
-    //=========================================
-
-    CollatzSequence result =
-        processor.getBestResult();
-
-
+    CollatzSequence result = processor.getBestResult();
     outputField->clear();
+    outputField->appendPlainText("Number with longest Collatz sequence: "
+        + QString::number(static_cast<qulonglong>(result.num)));
 
 
-    outputField->appendPlainText(
-        "Number with longest Collatz sequence: "
-        + QString::number(
-            static_cast<qulonglong>(result.num)
-        )
-    );
+    outputField->appendPlainText("Sequence length: "
+        + QString::number(static_cast<qulonglong>(result.sequence_l)));
 
 
-    outputField->appendPlainText(
-        "Sequence length: "
-        + QString::number(
-            static_cast<qulonglong>(result.sequence_l)
-        )
-    );
-
-
-    outputField->appendPlainText(
-        "Calculation time: "
-        + QString::number(elapsedMilliseconds)
-        + " ms"
-    );
+    outputField->appendPlainText("Calculation time: "
+        + QString::number(elapsedMilliseconds)+ " ms");
 }
