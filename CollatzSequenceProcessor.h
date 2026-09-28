@@ -1,7 +1,6 @@
 #ifndef COLLATZ_SEQUENCE_PROCESSOR_h
 #define COLLATZ_SEQUENCE_PROCESSOR_h
 
-
 #include <stdexcept>
 #include <vector>
 #include <mutex>
@@ -55,12 +54,23 @@ public:
 	CollatzSequence& operator=(CollatzSequence&& other) noexcept = default;
 };
 
+struct CollatzTask
+{
+	std::uint64_t begin;
+	std::uint64_t end;
+};
+
 class CollatzSequenceProcessor
 {
 private:
+
+	std::uint64_t work_portion = 0;
+	std::atomic<uint64_t> nextNum{ GlobalConstants::MIN_VALUE_LIMIT };
+
 	std::uint64_t numMax = 0;
 
 	std::atomic<unsigned int> numOfThreads = 0;
+	std::atomic<std::uint64_t> numberToOperate = 0;
 	std::vector<std::thread> calculation_threads;
 	std::thread main_thread;
 
@@ -69,6 +79,7 @@ private:
 	mutable std::atomic<bool> is_started = false;
 	mutable std::atomic<bool> is_stop = true;
 	mutable std::atomic<bool> err_found = false;
+	mutable std::atomic<bool> isFinito = false;
 
 	mutable std::mutex _mt;
 
@@ -76,11 +87,55 @@ private:
 
 	void reset()
 	{
+		nextNum.store(GlobalConstants::MIN_VALUE_LIMIT);
+		work_portion = 0;
 		numOfThreads = 0;
+		numberToOperate = 0;
+		isFinito = false;
 
 		std::lock_guard lock(_mt);
 		numMax = 0;
 		best_result = { 0,0 };
+	}
+
+	bool isOperationDone() const
+	{
+		return nextNum.load(std::memory_order_relaxed) >=
+			numberToOperate.load(std::memory_order_relaxed);;
+	}
+
+	void overflowTest(std::uint64_t max_n)
+	{
+		try
+		{
+			getNumSequence(max_n);
+		}
+		catch (const std::exception& ex)
+		{
+			std::osyncstream(std::cout) << ex.what() << "\n";
+		}
+	}
+
+	void verifyNumberOfThreads(unsigned int num_of_threads, std::uint64_t max_n)
+	{
+		unsigned int maxThreads = GlobalFunctions::getHardwareNumOfThreads();
+
+		if (max_n < GlobalConstants::MIN_VALUE_LIMIT)
+			throw std::invalid_argument("Upper limit is too small");
+
+		maxThreads = static_cast<std::uint64_t>(maxThreads) > max_n ? static_cast<unsigned int>(max_n) :
+			maxThreads == 0 ? 1 : maxThreads;
+		numOfThreads = std::clamp(num_of_threads, 1u, maxThreads);
+	}
+
+	CollatzTask createTask()
+	{
+		CollatzTask newTask = {};
+		newTask.begin = nextNum.fetch_add(work_portion, std::memory_order_relaxed);
+		newTask.end = std::min((newTask.begin + work_portion),
+			numberToOperate.load(std::memory_order_relaxed));
+
+		return newTask;
 	}
 
 	CollatzSequence getNumSequence(std::uint64_t num) const
@@ -176,12 +231,55 @@ private:
 		calculation_threads.push_back(std::move(nums_pool_thread));
 	}
 
+	void runThreadOptimized()
+	{
+		std::thread nums_pool_thread([this]() {
+
+			while (!isFinito.load(std::memory_order_relaxed) &&
+				!is_stop.load(std::memory_order_relaxed) &&
+				!err_found.load(std::memory_order_relaxed))
+			{
+				CollatzTask _task = createTask();
+
+				isFinito.store(isOperationDone());
+
+				CollatzSequence local_val;
+
+				for (std::uint64_t min = _task.begin; min <= _task.end; min++)
+				{
+					if (is_stop || err_found)
+						break;
+
+					CollatzSequence buffer = {};
+					try
+					{
+						buffer = getNumSequence(min);
+					}
+					catch (const std::exception& ex)
+					{
+						std::osyncstream(std::cout) << ex.what() << "\n";
+					}
+
+					local_val = buffer >= local_val ? std::move(buffer) : local_val;
+
+				}
+
+				if (!is_stop && !err_found)
+				{
+					std::lock_guard lock(_mt);
+					best_result = local_val >= best_result ? std::move(local_val) : best_result;
+				}
+
+			};
+		});
+
+		std::lock_guard lock(_mt);
+		calculation_threads.push_back(std::move(nums_pool_thread));
+	}
+
 	void runCalculation(std::uint64_t max_n, unsigned int num_of_threads)
 	{
-		unsigned int maxThreads = GlobalFunctions::getHardwareNumOfThreads();
-		maxThreads = static_cast<std::uint64_t>(maxThreads) > max_n ? 
-			static_cast<unsigned int>(max_n) : maxThreads;
-		numOfThreads = std::clamp(num_of_threads, 1u, maxThreads);
+		verifyNumberOfThreads(num_of_threads, max_n);
 		numMax = max_n;
 		calculation_threads.reserve(numOfThreads);
 
@@ -199,6 +297,24 @@ private:
 			runThread(min, max);
 
 			min = max + 1;
+		}
+
+	}
+
+	void runCalculationOptimized(std::uint64_t max_n, unsigned int num_of_threads)
+	{
+		verifyNumberOfThreads(num_of_threads, max_n);
+		numMax = max_n;
+
+		work_portion = std::min<uint64_t>( numMax / numOfThreads, GlobalConstants::MAX_WORK_PORTION);
+
+		calculation_threads.reserve(numOfThreads);
+
+		is_started = true;
+
+		for (unsigned int i = 0; i < numOfThreads; i++)
+		{
+			runThreadOptimized();
 		}
 
 	}
@@ -235,9 +351,18 @@ public:
 			
 			is_started = true;
 
+			//changes
+			nextNum.store(GlobalConstants::MIN_VALUE_LIMIT);
+			numberToOperate.store(max_n);
+			//
+
 			std::thread run_main([this, max_n,threadCount]() {
 
-				runCalculation(max_n, threadCount);
+				//runCalculation(max_n, threadCount);
+				
+				overflowTest(max_n);
+
+				runCalculationOptimized(max_n, threadCount);
 
 				joinCalulationThreads();
 
@@ -256,6 +381,8 @@ public:
 			std::osyncstream(std::cout) << " <<<<STOP>>>>> Operation stoped!\n";
 
 			is_stop = true;
+
+			reset();
 		}
 
 	}

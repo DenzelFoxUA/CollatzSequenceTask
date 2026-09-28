@@ -22,6 +22,8 @@ namespace GlobalConstants
 	static constexpr std::uint64_t CALC_DEFAULT_NUMBER = 10000000;
 
 	static constexpr const int DEFAULT_TIMER_INTERVAL_MSEC = 50;
+
+	static constexpr std::uint64_t MAX_WORK_PORTION = 1000;
 }
 
 namespace RegExPatterns

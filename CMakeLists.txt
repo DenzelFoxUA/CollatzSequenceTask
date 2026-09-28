@@ -19,6 +19,10 @@ qt_add_executable(CollatzSequenceTask
     Globals/Constants.cpp
 )
 
+if (MSVC)
+    target_compile_options(CollatzSequenceTask PRIVATE /EHsc)
+endif()
+
 target_include_directories(CollatzSequenceTask PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/Globals
 )
