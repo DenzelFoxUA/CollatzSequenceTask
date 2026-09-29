@@ -58,7 +58,6 @@ MainWindow::MainWindow(QWidget* parent): QMainWindow(parent)
     mainLayout->addLayout(threadLayout);
 
     // BUTTONS
-
     startButton = new QPushButton("Start", this);
     stopButton = new QPushButton("Stop", this);
     exitButton = new QPushButton("Exit", this);
@@ -72,7 +71,6 @@ MainWindow::MainWindow(QWidget* parent): QMainWindow(parent)
     mainLayout->addLayout(buttonLayout);
 
     // OUTPUT BOX
-
     QLabel* outputLabel = new QLabel("RESULT:", this);
 
     outputField = new QPlainTextEdit(this);
@@ -129,7 +127,7 @@ MainWindow::MainWindow(QWidget* parent): QMainWindow(parent)
 
 // Methods ------------------------------------------ 
 
-// UI STATe
+// UI STATE
 void MainWindow::setRunningState(bool running)
 {
     startButton->setEnabled(!running);
@@ -140,7 +138,6 @@ void MainWindow::setRunningState(bool running)
 }
 
 // START
-
 void MainWindow::startCalculation()
 {
     auto& processor = CollatzSequenceProcessor::getInstance();
@@ -171,7 +168,6 @@ void MainWindow::startCalculation()
 }
 
 // STOP
-
 void MainWindow::stopCalculation()
 {
     auto& processor = CollatzSequenceProcessor::getInstance();
@@ -183,14 +179,12 @@ void MainWindow::stopCalculation()
 
     processor.stop();
 
-    //кнопка вимкн
     stopButton->setEnabled(false);
 
     outputField->appendPlainText("Stopping calculation...");
 }
 
 // CALCULATION STATE CHECK
-
 void MainWindow::checkCalculationState()
 {
     auto& processor = CollatzSequenceProcessor::getInstance();
@@ -220,16 +214,13 @@ void MainWindow::checkCalculationState()
     }
 
     // Якщо SUCCESS
-
     CollatzSequence result = processor.getBestResult();
     outputField->clear();
     outputField->appendPlainText("Number with longest Collatz sequence: "
         + QString::number(static_cast<qulonglong>(result.num)));
 
-
     outputField->appendPlainText("Sequence length: "
         + QString::number(static_cast<qulonglong>(result.sequence_l)));
-
 
     outputField->appendPlainText("Calculation time: "
         + QString::number(elapsedMilliseconds)+ " ms");
