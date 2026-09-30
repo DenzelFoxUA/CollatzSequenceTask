@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <cstring>
 #include <string>
+#include <memory>
 
 #include "Constants.h"
 
@@ -75,6 +76,10 @@ private:
 	std::thread main_thread;
 
 	CollatzSequence best_result = {0,0};
+
+	//std::unique_ptr<std::atomic<std::uint64_t>[]> cached_stash;//8bytes variant x2 memory usage
+	std::unique_ptr<std::atomic<std::uint32_t>[]> cached_stash;//4bytes variant
+	std::uint64_t cache_size = 0;
 
 	mutable std::atomic<bool> is_started = false;
 	mutable std::atomic<bool> is_stop = true;

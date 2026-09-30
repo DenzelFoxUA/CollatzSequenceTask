@@ -7,6 +7,7 @@ void CollatzSequenceProcessor::reset()
 	work_portion = 0;
 	numOfThreads = 0;
 	numberToOperate = 0;
+
 	isFinito = false;
 
 	std::lock_guard lock(_mt);
@@ -16,7 +17,7 @@ void CollatzSequenceProcessor::reset()
 
 bool CollatzSequenceProcessor::isOperationDone() const
 {
-	return nextNum.load(std::memory_order_relaxed) >=
+	return nextNum.load(std::memory_order_relaxed) >
 		numberToOperate.load(std::memory_order_relaxed);;
 }
 
@@ -48,7 +49,7 @@ CollatzTask CollatzSequenceProcessor::createTask()
 {
 	CollatzTask newTask = {};
 	newTask.begin = nextNum.fetch_add(work_portion, std::memory_order_relaxed);
-	newTask.end = std::min((newTask.begin + work_portion),
+	newTask.end = std::min((newTask.begin + work_portion - 1),
 		numberToOperate.load(std::memory_order_relaxed));
 
 	return newTask;
@@ -60,8 +61,35 @@ CollatzSequence CollatzSequenceProcessor::getNumSequence(std::uint64_t num) cons
 	res.num = num;
 	res.sequence_l = 1;
 
-	while (num > GlobalConstants::MIN_VALUE_LIMIT)
+	std::vector<uint64_t> path;
+
+	while (true)
 	{
+		//add-on
+
+		if (num < cache_size)
+		{
+			std::uint32_t length = cached_stash[num].load(std::memory_order_relaxed);
+
+			if (length != 0)
+			{
+
+				for (auto it = path.rbegin(); it != path.rend(); ++it)
+				{
+					++length;
+
+					if (*it < cache_size)
+						cached_stash[*it].store(length, std::memory_order_relaxed);
+				}
+			}
+
+			res.sequence_l = length;
+
+			return res;
+		}
+
+		path.push_back(num);
+
 		if (num % 2 == 0)
 		{
 			num /= 2;
@@ -79,10 +107,7 @@ CollatzSequence CollatzSequenceProcessor::getNumSequence(std::uint64_t num) cons
 
 			num = 3 * num + 1;
 		}
-		res.sequence_l++;
 	}
-
-	return res;
 }
 
 void CollatzSequenceProcessor::joinCalulationThreads()
@@ -252,6 +277,15 @@ void CollatzSequenceProcessor::start(std::uint64_t max_n, unsigned int threadCou
 		//changes
 		nextNum.store(GlobalConstants::MIN_VALUE_LIMIT);
 		numberToOperate.store(max_n);
+
+		cache_size = max_n + 1;
+		cached_stash = std::make_unique<std::atomic<std::uint32_t>[]>(cache_size);
+
+		for (std::uint64_t i = 0; i < cache_size; ++i)
+		{
+			cached_stash[i].store(0, std::memory_order_relaxed);
+		}
+		cached_stash[1].store(1, std::memory_order_relaxed);
 		//
 
 		std::thread run_main([this, max_n, threadCount]() {
@@ -279,8 +313,6 @@ void CollatzSequenceProcessor::stop()
 		std::osyncstream(std::cout) << " <<<<STOP>>>>> Operation stoped!\n";
 
 		is_stop = true;
-
-		reset();
 	}
 
 }
